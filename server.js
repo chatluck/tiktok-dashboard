@@ -141,7 +141,7 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, '127.0.0.1', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n  ✅ TikTok 业绩统计看板已启动！`);
   console.log(`  ───────────────────────────────────`);
   console.log(`  地址: http://localhost:${PORT}`);
