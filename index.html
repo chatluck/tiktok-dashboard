@@ -1,0 +1,2004 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TikTok 每日业绩统计看板</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #f0f4f8;
+      --card: #ffffff;
+      --primary: #2563eb;
+      --primary-soft: #dbeafe;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #111827;
+      --muted: #4b5563;
+      --border: #d1d5db;
+      --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      background: linear-gradient(180deg, #edf4ff 0%, var(--bg) 240px);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 1660px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+    }
+
+    .title h1 { margin: 0 0 8px; font-size: 32px; }
+    .title p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.7; }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-secondary { background: #fff; color: var(--text); border: 1px solid var(--border); }
+
+    #deleteStoreBtn {
+      background: var(--danger);
+      color: white;
+      font-weight: 600;
+    }
+
+    #deleteStoreBtn:hover {
+      background: #dc2626;
+      transform: translateY(-2px);
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(0,0,0,0.05);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .banner, .main-grid, .mid-grid, .bottom-grid {
+      display: grid;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .banner { grid-template-columns: 1.1fr .9fr; }
+    .main-grid { grid-template-columns: 1.08fr .92fr; }
+    .mid-grid { grid-template-columns: .9fr 1.1fr; }
+    .bottom-grid { grid-template-columns: 1fr 1fr; }
+
+    .banner h2, .section-title h2 { margin: 0; font-size: 22px; }
+    .banner p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.8; }
+
+    .period-box { background: linear-gradient(135deg, #eff6ff, #ffffff); }
+
+    .period-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .period-item {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .period-item span {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .period-item strong {
+      font-size: 15px;
+      word-break: break-word;
+    }
+
+    .import-card p { margin: 0 0 12px; color: var(--muted); line-height: 1.7; font-size: 13px; }
+    .import-message {
+      margin-top: 12px;
+      padding: 12px 14px;
+      background: #f8fafc;
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .hint-list {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin: 24px 0;
+    }
+
+    .filter-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    label { font-size: 13px; color: var(--muted); }
+
+    select, input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    select:focus, input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::after {
+      content: "";
+      position: absolute;
+      right: -20px;
+      top: -20px;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: var(--primary-soft);
+      opacity: 0.5;
+    }
+
+    .stat-label, .stat-value, .stat-trend { position: relative; z-index: 1; }
+    .stat-label { color: var(--muted); font-size: 14px; margin-bottom: 10px; }
+    .stat-value { font-size: 32px; font-weight: 800; margin-bottom: 8px; }
+    .stat-trend { font-size: 13px; }
+    .up { color: var(--danger); }
+    .down { color: var(--success); }
+    .flat { color: var(--muted); }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .section-title span { color: var(--muted); font-size: 13px; }
+
+    .chart-toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+
+    .chart-toolbar select { min-width: 180px; }
+    .chart-wrap { height: 360px; }
+
+    .store-list, .ranking-list, .compare-list, .country-list, .import-log-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .store-item, .ranking-item, .compare-item, .country-item, .import-log-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      background: #f8fafc;
+      border-radius: 14px;
+    }
+
+    .store-item.clickable, .country-item.clickable {
+      cursor: pointer;
+      transition: .2s ease;
+    }
+
+    .store-item.clickable:hover, .country-item.clickable:hover {
+      background: #eef4ff;
+      transform: translateY(-1px);
+    }
+
+    .store-item.active, .country-item.active {
+      background: #dbeafe;
+      border: 1px solid #93c5fd;
+    }
+
+    .linkage-tip {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    #chartLinkageBar {
+      transition: opacity .2s ease;
+    }
+
+    #chartLinkageBar .clear-btn {
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+
+    .store-item strong, .compare-item strong, .country-item strong, .import-log-item strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .store-item span, .compare-item span, .country-item span, .import-log-item span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .store-value, .compare-value, .country-value, .import-log-value { text-align: right; }
+    .store-value b, .compare-value b, .country-value b, .import-log-value b {
+      display: block;
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+
+    .table-card { margin-bottom: 24px; }
+    .table-summary {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+      padding: 12px 14px;
+      background: #f8fafc;
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 1860px; }
+    th, td {
+      text-align: left;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    tr:hover td {
+      background: #f8fafc;
+    }
+
+    th {
+      background: #f9fafb;
+      color: var(--text);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .tag-high { background: #fee2e2; color: var(--danger); }
+    .tag-mid { background: #fef3c7; color: var(--warning); }
+    .tag-low { background: #dcfce7; color: var(--success); }
+
+    .ranking-name {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .ranking-index {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .empty-state {
+      padding: 28px 16px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .collapse-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 13px;
+      cursor: pointer;
+      transition: .2s ease;
+      user-select: none;
+    }
+
+    .collapse-toggle:hover {
+      background: #f0f5ff;
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .collapse-toggle .arrow {
+      display: inline-block;
+      transition: transform .25s ease;
+      font-size: 11px;
+    }
+
+    .collapse-toggle.collapsed .arrow {
+      transform: rotate(-90deg);
+    }
+
+    .collapsible-body {
+      overflow: hidden;
+      transition: max-height .35s ease, opacity .25s ease;
+      max-height: 8000px;
+      opacity: 1;
+    }
+
+    .collapsible-body.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
+
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255,255,255,.72);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .loading-overlay.hidden { display: none; }
+
+    .loading-spinner {
+      width: 44px;
+      height: 44px;
+      border: 4px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .footer-note {
+      margin-top: 20px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    @media (max-width: 1320px) {
+      .banner, .main-grid, .mid-grid, .bottom-grid { grid-template-columns: 1fr; }
+      .period-grid, .filters-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 768px) {
+      .container { padding: 16px; }
+      .title h1 { font-size: 26px; }
+      .period-grid, .filters-grid { grid-template-columns: 1fr; }
+      .stat-value { font-size: 24px; }
+      .chart-toolbar { flex-direction: column; align-items: stretch; }
+    }
+
+    /* 删除店铺模态框 */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-box {
+      background: #fff;
+      border-radius: 18px;
+      padding: 28px 32px;
+      width: 420px;
+      max-width: 90vw;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+
+    .modal-box h3 {
+      margin: 0 0 6px;
+      font-size: 20px;
+    }
+
+    .modal-box p {
+      margin: 0 0 20px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .modal-box .filter-item {
+      margin-bottom: 20px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .modal-actions .btn {
+      padding: 10px 20px;
+      border-radius: 10px;
+    }
+
+    #deleteModalMessage {
+      margin-top: 12px;
+      font-size: 13px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="loading-overlay hidden" id="loadingOverlay"><div class="loading-spinner"></div></div>
+  <div class="container">
+    <div class="header">
+      <div class="title">
+        <h1>TikTok 每日业绩统计看板</h1>
+        <p>支持按国家汇总、按店铺排名，并增强店铺数据持久化。导入过的店铺文件会保留导入记录，方便追踪最近一次更新来源。</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-secondary" id="loadSampleBtn">加载示例数据</button>
+        <button class="btn btn-secondary" id="refreshRateBtn">刷新实时汇率</button>
+        <button class="btn btn-secondary" id="clearBtn">清空当前数据</button>
+        <button class="btn btn-primary" id="exportBtn">导出汇总数据</button>
+        <button class="btn btn-secondary" id="deleteStoreHeaderBtn" style="color:#ef4444;border-color:#fca5a5;">删除店铺</button>
+        <button class="btn btn-secondary" id="exportBackupBtn" style="font-size:12px;padding:8px 12px;">📥 备份</button>
+        <button class="btn btn-secondary" id="importBackupBtn" style="font-size:12px;padding:8px 12px;">📤 恢复</button>
+        <span id="serverStatus" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#6b7280;white-space:nowrap;">⚪ 离线</span>
+      </div>
+    </div>
+
+    <div class="banner">
+      <div class="card period-box">
+        <h2>导入规则与当前周期</h2>
+        <p>文件名中带国家和店编即可自动识别店铺，例如：<strong>Tiktok-10001TH</strong>、<strong>Tiktok-10002PH</strong>。系统会按店编累计保存数据，并对 THB / PHP GMV 自动换算成人民币。</p>
+        <div class="period-grid">
+          <div class="period-item"><span>分析周期</span><strong id="analysisPeriod">01/05/2026 - 14/05/2026</strong></div>
+          <div class="period-item"><span>对比周期</span><strong id="comparePeriod">17/04/2026 - 30/04/2026</strong></div>
+          <div class="period-item"><span>当前数据模式</span><strong id="dataMode">多店铺每日数据示例</strong></div>
+          <div class="period-item"><span>已识别店铺</span><strong id="storeCount">2 个</strong></div>
+          <div class="period-item"><span>今日 THB/CNY</span><strong id="thbRate">0.1980</strong></div>
+          <div class="period-item"><span>今日 PHP/CNY</span><strong id="phpRate">0.1270</strong></div>
+          <div class="period-item"><span>汇率更新时间</span><strong id="rateUpdatedAt">未刷新</strong></div>
+          <div class="period-item"><span>汇率状态</span><strong id="rateStatus">等待刷新</strong></div>
+        </div>
+      </div>
+
+      <div class="card import-card">
+        <h2 style="margin:0 0 10px; font-size:20px;">导入 TikTok 分析表</h2>
+        <p>支持导入 `.xlsx / .xls / .csv`。优先识别“每日数据”区域；如果没有该标题，则会尝试按“日期”表头自动识别。</p>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple />
+        <ul class="hint-list">
+          <li>文件名请包含国家和店编，例如：`Tiktok-10001TH`、`Tiktok-10002PH`、`Tiktok-10011TH-ZC`（支持可选后缀）。</li>
+          <li>TH = 泰国店，GMV 按泰铢换人民币；PH = 菲律宾店，GMV 按比索换人民币。</li>
+          <li>重复导入同店铺时，会按“店编 + 日期”覆盖更新。</li>
+        </ul>
+        <div class="import-message" id="importMessage">当前已内置多店铺示例。你可以一次导入多个店铺文件，系统会按店编自动归档。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">
+        <h2>多店铺筛选</h2>
+        <span>按国家、店编和实际月份范围筛选当前视图</span>
+      </div>
+      <div class="filters-grid">
+        <div class="filter-item"><label for="countryFilter">国家</label><select id="countryFilter"></select></div>
+        <div class="filter-item"><label for="storeFilter">店编</label><select id="storeFilter"></select></div>
+        <div class="filter-item"><label for="compareStoreFilter">单店对比视图</label><select id="compareStoreFilter"></select></div>
+        <div class="filter-item"><label for="startMonthFilter">开始月份</label><input type="month" id="startMonthFilter" /></div>
+        <div class="filter-item"><label for="endMonthFilter">结束月份</label><input type="month" id="endMonthFilter" /></div>
+      </div>
+      <div id="chartLinkageBar" style="display:none;margin-top:12px;padding:10px 16px;background:#eff6ff;border-radius:12px;border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:space-between;font-size:13px;">
+        <span id="chartLinkageText"></span>
+        <button class="btn btn-secondary" id="clearDateFilterBtn" style="padding:6px 12px;font-size:12px;border-radius:8px;">清除日期筛选</button>
+      </div>
+    </div>
+
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <div class="main-grid">
+      <div class="card">
+        <div class="section-title">
+          <h2><span id="trendChartTitle">每日趋势图</span></h2>
+          <span>可切换指标并查看趋势变化</span>
+        </div>
+        <div class="chart-toolbar">
+          <select id="metricSelect"></select>
+          <button class="btn btn-secondary" id="viewDayBtn" style="background:#2563eb;color:#fff">日度</button>
+          <button class="btn btn-secondary" id="viewMonthBtn">月度</button>
+        </div>
+        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <h2>店铺排名</h2>
+          <span>按人民币 GMV 从高到低排序</span>
+        </div>
+        <div class="store-list" id="storeList"></div>
+        <div class="linkage-tip" id="storeLinkageTip">点击任一店铺，可自动联动筛选当前页面到该店铺。</div>
+      </div>
+    </div>
+
+    <div class="mid-grid">
+      <div class="card">
+        <div class="section-title">
+          <h2>按国家汇总</h2>
+          <span>查看不同国家的人民币贡献</span>
+        </div>
+        <div class="country-list" id="countryList"></div>
+        <div class="linkage-tip" id="countryLinkageTip">点击任一国家，可自动联动筛选当前页面到该国家。</div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <h2>导入记录</h2>
+          <span>保留每个店铺最近一次导入文件与时间</span>
+        </div>
+        <div class="import-log-list" id="importLogList"></div>
+      </div>
+    </div>
+
+    <div class="bottom-grid">
+      <div class="card">
+        <div class="section-title">
+          <h2>单店对比视图</h2>
+          <span>查看单店在当前筛选周期内的表现</span>
+        </div>
+        <div class="compare-list" id="compareList"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <h2>流量结构占比</h2>
+          <span>按曝光 / 点击 / 访客结构展示</span>
+        </div>
+        <div class="chart-wrap"><canvas id="flowChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card table-card">
+      <div class="section-title">
+        <h2><span id="tableTitle">每日明细表</span></h2>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span id="tableSubtitle">按店铺 + 日期记录，GMV 同时保留原币和人民币</span>
+          <button class="collapse-toggle collapsed" id="tableCollapseBtn"><span class="arrow">▼</span> 展开表格</button>
+        </div>
+      </div>
+      <div id="tableCollapsibleBody" class="collapsible-body collapsed">
+        <div class="table-summary">
+          <div id="tableSummaryLeft">当前记录：0 条</div>
+          <div id="tableSummaryRight">识别结构：多店铺 TikTok 每日数据</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>店编</th>
+                <th>国家</th>
+                <th>币种</th>
+                <th id="dateColumnTitle">日期</th>
+                <th>GMV（原币）</th>
+                <th>汇率</th>
+                <th>GMV（人民币）</th>
+                <th>订单数</th>
+                <th>客户数</th>
+                <th>商品成交件数</th>
+                <th>已退款的商品件数</th>
+                <th>SKU 订单数</th>
+                <th>总成交额</th>
+                <th>页面浏览次数</th>
+                <th>商品访客数</th>
+                <th>转化率</th>
+                <th>商品曝光次数</th>
+                <th>去重商品曝光次数</th>
+                <th>商品点击量</th>
+                <th>去重点击次数</th>
+                <th>平均订单金额</th>
+                <th id="performanceColumnTitle">日度表现</th>
+              </tr>
+            </thead>
+            <tbody id="recordTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">
+        <h2><span id="rankingTitle">人民币 GMV 高峰日排行</span></h2>
+        <span id="rankingSubtitle">按单日人民币 GMV 排序</span>
+      </div>
+      <div class="ranking-list" id="rankingList"></div>
+    </div>
+
+    <div class="footer-note">后续如果你继续给不同国家、不同店编的文件，这个页面会按店铺持续沉淀数据。</div>
+  </div>
+
+  <!-- 删除店铺模态框 -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal-box">
+      <h3>删除店铺数据</h3>
+      <p>选择要删除的店铺，此操作不可恢复。</p>
+      <div class="filter-item">
+        <label for="deleteStoreFilter">选择店铺</label>
+        <select id="deleteStoreFilter"></select>
+      </div>
+      <div id="deleteModalMessage"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="deleteModalCancelBtn">取消</button>
+        <button class="btn btn-primary" id="deleteStoreBtn">确认删除</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const DEFAULT_RATES = { THB: 0.198, PHP: 0.127, CNY: 1 };
+    const COUNTRY_MAP = {
+      TH: { country: '泰国', currency: 'THB' },
+      PH: { country: '菲律宾', currency: 'PHP' },
+      CN: { country: '中国', currency: 'CNY' }
+    };
+
+    const sampleFiles = [
+      {
+        fileName: 'Tiktok-10001TH_Shop Analytics_Key metrics_20260515.xlsx',
+        meta: { analysisPeriod: '01/05/2026 - 14/05/2026', comparePeriod: '17/04/2026 - 30/04/2026', mode: '多店铺每日数据示例' },
+        rows: [
+          ['01/05/2026', 11474.32, 32, 32, 194, '-', 192, 12164.23, 573, 405, 0.07901234567901234, 10626, 6534, 561, 395, 59.76],
+          ['02/05/2026', 9647.59, 26, 26, 156, 291.53, 156, 10181.51, 533, 367, 0.07084468664850137, 10241, 6543, 531, 360, 61.84],
+          ['03/05/2026', 6564.02, 20, 20, 120, '-', 120, 7018.51, 495, 362, 0.055248618784530384, 9638, 6137, 496, 359, 54.7],
+          ['04/05/2026', 9221.05, 26, 26, 157, 330.15, 156, 9849.78, 489, 356, 0.07303370786516854, 9184, 5558, 503, 351, 59.11],
+          ['05/05/2026', 12742.15, 35, 34, 210, 579.36, 210, 13587.82, 500, 355, 0.09577464788732394, 9627, 5769, 516, 353, 60.68],
+          ['06/05/2026', 5911.57, 13, 13, 78, 338.25, 78, 6169.99, 448, 328, 0.039634146341463415, 8334, 5452, 449, 327, 75.79],
+          ['07/05/2026', 16609.75, 44, 42, 264, 1031.77, 264, 17474.74, 746, 515, 0.08155339805825243, 15282, 8798, 800, 525, 62.92],
+          ['01/06/2026', 14980.15, 39, 38, 225, 480.23, 224, 15876.80, 688, 492, 0.07723577235772358, 14261, 8298, 746, 501, 61.22],
+          ['02/06/2026', 17220.85, 46, 45, 271, 365.51, 268, 18155.20, 755, 518, 0.08687258687258688, 15322, 9017, 812, 548, 63.08]
+        ]
+      },
+      {
+        fileName: 'Tiktok-20001PH_Shop Analytics_Key metrics_20260515.xlsx',
+        meta: { analysisPeriod: '08/05/2026 - 14/05/2026', comparePeriod: '01/05/2026 - 07/05/2026', mode: '多店铺每日数据示例' },
+        rows: [
+          ['08/05/2026', 18381.36, 48, 47, 282, 374.93, 278, 19046.29, 1057, 719, 0.06536856745479833, 22876, 11689, 1080, 726, 66.12],
+          ['09/05/2026', 13282.64, 37, 36, 222, 1277.17, 222, 13811.87, 1010, 714, 0.05042016806722689, 23788, 13177, 1067, 737, 59.83],
+          ['10/05/2026', 13602.09, 36, 34, 218, 1018.08, 216, 14531.41, 976, 661, 0.05143721633888049, 22099, 11386, 1024, 675, 62.97],
+          ['11/05/2026', 21305.29, 56, 55, 336, '-', 336, 22473.57, 958, 620, 0.08870967741935484, 22505, 11147, 1002, 637, 63.41],
+          ['12/05/2026', 18036.78, 50, 47, 301, 994, 301, 19135.34, 938, 651, 0.07219662058371736, 23762, 12214, 1037, 696, 59.92],
+          ['13/05/2026', 27866.93, 71, 69, 420, '-', 417, 29341.73, 1140, 820, 0.08414634146341464, 30483, 17465, 1330, 923, 66.83],
+          ['14/05/2026', 26962.47, 76, 75, 449, 312.09, 447, 29960.54, 0, 844, 0.08886255924170616, 34321, 18528, 1444, 945, 60.32],
+          ['01/06/2026', 19885.33, 55, 53, 318, 288.20, 315, 20631.10, 1016, 702, 0.07834757834757835, 26118, 14422, 1150, 775, 64.91],
+          ['02/06/2026', 24126.42, 68, 65, 386, 412.74, 380, 25109.60, 1124, 790, 0.0860759493670886, 28996, 16114, 1288, 861, 66.84]
+        ]
+      },
+      {
+        fileName: 'Tiktok-10011TH-ZC_Shop Analytics_Key metrics_20260515.xlsx',
+        meta: { analysisPeriod: '01/05/2026 - 14/05/2026', comparePeriod: '17/04/2026 - 30/04/2026', mode: '多店铺每日数据示例' },
+        rows: [
+          ['01/05/2026', 8542.18, 24, 23, 145, '-', 142, 9125.30, 412, 298, 0.08254867256637168, 7856, 4892, 421, 295, 55.35],
+          ['02/05/2026', 7233.45, 20, 19, 118, 195.20, 116, 7658.92, 398, 285, 0.0673828125, 7524, 4623, 398, 282, 58.92],
+          ['03/05/2026', 9125.67, 25, 24, 152, '-', 150, 9845.21, 425, 305, 0.0825234375, 8102, 5120, 442, 310, 57.64],
+          ['04/05/2026', 6845.32, 18, 17, 105, 280.15, 102, 7256.80, 380, 272, 0.06512345679012345, 7256, 4580, 378, 270, 62.38],
+          ['05/05/2026', 10256.78, 28, 27, 168, 425.30, 165, 11025.45, 465, 328, 0.08641975308641975, 8520, 5480, 468, 332, 59.85]
+        ]
+      }
+    ];
+
+    const metricOptions = [
+      { key: 'gmvCny', label: 'GMV（人民币）', type: 'currency' },
+      { key: 'gmvOriginal', label: 'GMV（原币）', type: 'currency' },
+      { key: 'orders', label: '订单数', type: 'integer' },
+      { key: 'customers', label: '客户数', type: 'integer' },
+      { key: 'conversionRate', label: '转化率', type: 'percent' },
+      { key: 'pageViews', label: '页面浏览次数', type: 'integer' },
+      { key: 'visitors', label: '商品访客数', type: 'integer' },
+      { key: 'impressions', label: '商品曝光次数', type: 'integer' },
+      { key: 'clicks', label: '商品点击量', type: 'integer' },
+      { key: 'aov', label: '平均订单金额', type: 'currency' }
+    ];
+
+    const storageKey = 'tiktok-daily-performance-stores';
+    const DATA_API = '/api/data';
+    let serverAvailable = false;
+
+    // 检测服务器是否可用
+    async function checkServer() {
+      try {
+        const res = await fetch('/api/ping', { method: 'GET', cache: 'no-cache' });
+        serverAvailable = res.ok;
+      } catch { serverAvailable = false; }
+      return serverAvailable;
+    }
+
+    // 从本地 JSON 文件读取数据（通过服务器 API）
+    async function loadFromFile() {
+      try {
+        const res = await fetch(DATA_API, { method: 'GET', cache: 'no-cache' });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.empty ? null : data;
+      } catch { return null; }
+    }
+
+    // 保存数据到本地 JSON 文件（通过服务器 API）
+    async function saveToFile(data) {
+      try {
+        const res = await fetch(DATA_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        return res.ok;
+      } catch { return false; }
+    }
+
+    let trendChart;
+    let flowChart;
+    let selectedMetric = 'gmvCny';
+    let state;
+    let filters = { country: 'ALL', storeCode: 'ALL', compareStoreCode: 'ALL', startMonth: '', endMonth: '', selectedDate: '' };
+    let viewMode = 'day';
+
+    function buildSampleState() {
+      const exchangeRates = { ...DEFAULT_RATES };
+      const importLogs = sampleFiles.map((file, index) => {
+        const info = parseStoreInfo(file.fileName);
+        return {
+          storeCode: info.storeCode,
+          countryCode: info.countryCode,
+          fileName: file.fileName,
+          importedAt: `2026-05-15 1${index}:00:00`,
+          recordCount: file.rows.length
+        };
+      });
+      return {
+        meta: { analysisPeriod: '01/05/2026 - 14/05/2026', comparePeriod: '17/04/2026 - 30/04/2026', mode: '多店铺每日数据示例' },
+        exchangeRates,
+        rateUpdatedAt: '',
+        rateStatus: '未刷新',
+        importLogs,
+        records: sampleFiles.flatMap(file => buildStoreRecords(file.rows, parseStoreInfo(file.fileName), file.meta, exchangeRates))
+      };
+    }
+
+    // 加载数据：优先从服务器 API（data.json），后备到 localStorage
+    async function loadState() {
+      // 先尝试从服务器 API 读取（data.json 文件）
+      const fileData = await loadFromFile();
+      if (fileData) {
+        serverAvailable = true;
+        return fileData;
+      }
+      // 后备：localStorage（兼容 file:// 直接打开的情况）
+      serverAvailable = false;
+      try { return JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { return null; }
+    }
+
+    // 保存数据：优先保存到服务器（data.json），同时写入 localStorage 作为后备
+    async function saveState() {
+      localStorage.setItem(storageKey, JSON.stringify(state));
+      await saveToFile(state);
+    }
+
+    function toNumber(value) {
+      if (typeof value === 'number') return value;
+      if (value === '-' || value === '' || value == null) return 0;
+      const cleaned = String(value).replace(/,/g, '').replace(/[^\d.-]/g, '');
+      const num = Number(cleaned);
+      return Number.isFinite(num) ? num : 0;
+    }
+
+    function toDateLabel(value) {
+      const text = String(value || '').trim();
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(text)) return text;
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) {
+        const d = String(date.getDate()).padStart(2, '0');
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const y = date.getFullYear();
+        return `${d}/${m}/${y}`;
+      }
+      return text;
+    }
+
+    function dateLabelToInput(dateLabel) {
+      if (!dateLabel) return '';
+      const [d, m, y] = dateLabel.split('/');
+      return `${y}-${m}-${d}`;
+    }
+
+    function getMonthFromDate(dateLabel) {
+      if (!dateLabel) return '';
+      const [d, m, y] = dateLabel.split('/');
+      return `${y}-${m}`;
+    }
+
+    function formatMonthLabel(month) {
+      if (!month) return '-';
+      const [y, m] = month.split('-');
+      return `${y}年${m}月`;
+    }
+
+    function formatNumber(value, digits = 0) {
+      return Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    }
+
+    function formatValue(value, type) {
+      if (type === 'currency') return formatNumber(value, 2);
+      if (type === 'percent') return `${(Number(value || 0) * 100).toFixed(2)}%`;
+      if (type === 'integer') return formatNumber(value, 0);
+      return String(value ?? '-');
+    }
+
+    function parseStoreInfo(fileName) {
+      const normalized = String(fileName || '').replace(/\s+/g, ' ');
+      // 支持带后缀的店编，如 Tiktok-10011TH-ZC → 店编 10011ZC
+      const match = normalized.match(/(?:Tiktok|TikTok|tiktok)[-_]?([0-9]{4,})(TH|PH|CN)(?:[-_]?([A-Za-z0-9]+))?/i)
+                 || normalized.match(/([0-9]{4,})(TH|PH|CN)(?:[-_]?([A-Za-z0-9]+))?/i);
+      const numCode = match ? match[1] : 'unknown';
+      const countryCode = match ? match[2].toUpperCase() : 'CN';
+      const suffix = match && match[3] ? match[3].toUpperCase() : '';
+      const storeCode = suffix ? `${numCode}${suffix}` : numCode;
+      const countryInfo = COUNTRY_MAP[countryCode] || COUNTRY_MAP.CN;
+      return { storeCode, numCode, suffix, countryCode, country: countryInfo.country, currency: countryInfo.currency, sourceFile: fileName };
+    }
+
+    function buildRecord(row, storeInfo, meta, exchangeRates) {
+      const rate = exchangeRates[storeInfo.currency] || 1;
+      const gmvOriginal = toNumber(row[1]);
+      return {
+        storeCode: storeInfo.storeCode,
+        countryCode: storeInfo.countryCode,
+        country: storeInfo.country,
+        currency: storeInfo.currency,
+        sourceFile: storeInfo.sourceFile,
+        analysisPeriod: meta.analysisPeriod || '-',
+        comparePeriod: meta.comparePeriod || '-',
+        date: toDateLabel(row[0]),
+        gmvOriginal,
+        exchangeRate: rate,
+        gmvCny: gmvOriginal * rate,
+        orders: toNumber(row[2]),
+        customers: toNumber(row[3]),
+        soldItems: toNumber(row[4]),
+        refundedItems: toNumber(row[5]),
+        skuOrders: toNumber(row[6]),
+        revenue: toNumber(row[7]),
+        pageViews: toNumber(row[8]),
+        visitors: toNumber(row[9]),
+        conversionRate: toNumber(row[10]),
+        impressions: toNumber(row[11]),
+        uniqueImpressions: toNumber(row[12]),
+        clicks: toNumber(row[13]),
+        uniqueClicks: toNumber(row[14]),
+        aov: toNumber(row[15])
+      };
+    }
+
+    function buildStoreRecords(rows, storeInfo, meta, exchangeRates) {
+      return rows.map(row => buildRecord(row, storeInfo, meta, exchangeRates));
+    }
+
+    function mergeRecords(existing, incoming) {
+      const map = new Map(existing.map(item => [`${item.storeCode}_${item.date}`, item]));
+      incoming.forEach(item => map.set(`${item.storeCode}_${item.date}`, item));
+      return [...map.values()].sort((a, b) => {
+        const storeCompare = a.storeCode.localeCompare(b.storeCode);
+        if (storeCompare !== 0) return storeCompare;
+        return dateLabelToInput(a.date).localeCompare(dateLabelToInput(b.date));
+      });
+    }
+
+    function updateImportLogs(existingLogs, logsToUpsert) {
+      const map = new Map(existingLogs.map(item => [item.storeCode, item]));
+      logsToUpsert.forEach(item => map.set(item.storeCode, item));
+      return [...map.values()].sort((a, b) => b.importedAt.localeCompare(a.importedAt));
+    }
+
+    function getMetricMeta(key) {
+      return metricOptions.find(item => item.key === key) || metricOptions[0];
+    }
+
+    function calcTrend(current, previous) {
+      // 没有上一个周期数据时不显示趋势
+      if (previous === 0 && current === 0) return { text: '', cls: '' };
+      if (previous === 0) return { text: '', cls: '' };
+      const rate = ((current - previous) / previous) * 100;
+      // 始终按月比较（全部数据时），或者按日比较（筛选具体日期时）
+      const useMonthCompare = viewMode === 'month';
+      const prefix = rate > 0 ? `${useMonthCompare ? '较上月 +' : '较上日 +'}` : `${useMonthCompare ? '较上月 ' : '较上日 '}`;
+      if (rate > 0) return { text: `${prefix}${rate.toFixed(1)}%`, cls: 'up' };
+      if (rate < 0) return { text: `${prefix}${rate.toFixed(1)}%`, cls: 'down' };
+      return { text: useMonthCompare ? '较上月持平' : '较上日持平', cls: 'flat' };
+    }
+
+    function getFilteredRecords() {
+      return state.records.filter(item => {
+        if (filters.country !== 'ALL' && item.countryCode !== filters.country) return false;
+        if (filters.storeCode !== 'ALL' && item.storeCode !== filters.storeCode) return false;
+        const itemMonth = getMonthFromDate(item.date);
+        if (filters.startMonth && itemMonth < filters.startMonth) return false;
+        if (filters.endMonth && itemMonth > filters.endMonth) return false;
+        if (filters.selectedDate) {
+          if (viewMode === 'month') {
+            const itemM = getMonthFromDate(item.date);
+            if (itemM !== filters.selectedDate) return false;
+          } else {
+            if (item.date !== filters.selectedDate) return false;
+          }
+        }
+        return true;
+      });
+    }
+
+    function aggregateByDate(records) {
+      const map = new Map();
+      records.forEach(item => {
+        if (!map.has(item.date)) {
+          map.set(item.date, { date: item.date, gmvCny: 0, gmvOriginal: 0, orders: 0, customers: 0, soldItems: 0, refundedItems: 0, skuOrders: 0, revenue: 0, conversionRateTotal: 0, conversionRateCount: 0, pageViews: 0, visitors: 0, impressions: 0, uniqueImpressions: 0, clicks: 0, uniqueClicks: 0, aov: 0, aovCount: 0, days: 1 });
+        }
+        const agg = map.get(item.date);
+        agg.gmvCny += item.gmvCny;
+        agg.gmvOriginal += item.gmvOriginal;
+        agg.orders += item.orders;
+        agg.customers += item.customers;
+        agg.soldItems += item.soldItems;
+        agg.refundedItems += item.refundedItems;
+        agg.skuOrders += item.skuOrders;
+        agg.revenue += item.revenue;
+        agg.pageViews += item.pageViews;
+        agg.visitors += item.visitors;
+        agg.impressions += item.impressions;
+        agg.uniqueImpressions += item.uniqueImpressions;
+        agg.clicks += item.clicks;
+        agg.uniqueClicks += item.uniqueClicks;
+        agg.conversionRateTotal += item.conversionRate;
+        agg.conversionRateCount += 1;
+        agg.aov += item.aov;
+        agg.aovCount += 1;
+      });
+      return [...map.values()].map(item => ({
+        ...item,
+        conversionRate: item.conversionRateCount ? item.conversionRateTotal / item.conversionRateCount : 0,
+        aov: item.aovCount ? item.aov / item.aovCount : 0
+      })).sort((a, b) => dateLabelToInput(a.date).localeCompare(dateLabelToInput(b.date)));
+    }
+
+    function aggregateByMonth(records) {
+      const map = new Map();
+      records.forEach(item => {
+        const month = getMonthFromDate(item.date);
+        if (!month) return;
+        if (!map.has(month)) {
+          map.set(month, { month, gmvCny: 0, gmvOriginal: 0, orders: 0, customers: 0, soldItems: 0, refundedItems: 0, skuOrders: 0, revenue: 0, conversionRateTotal: 0, conversionRateCount: 0, pageViews: 0, visitors: 0, impressions: 0, uniqueImpressions: 0, clicks: 0, uniqueClicks: 0, aov: 0, aovCount: 0, days: 0 });
+        }
+        const agg = map.get(month);
+        agg.gmvCny += item.gmvCny;
+        agg.gmvOriginal += item.gmvOriginal;
+        agg.orders += item.orders;
+        agg.customers += item.customers;
+        agg.soldItems += item.soldItems;
+        agg.refundedItems += item.refundedItems;
+        agg.skuOrders += item.skuOrders;
+        agg.revenue += item.revenue;
+        agg.pageViews += item.pageViews;
+        agg.visitors += item.visitors;
+        agg.impressions += item.impressions;
+        agg.uniqueImpressions += item.uniqueImpressions;
+        agg.clicks += item.clicks;
+        agg.uniqueClicks += item.uniqueClicks;
+        agg.conversionRateTotal += item.conversionRate;
+        agg.conversionRateCount += 1;
+        agg.aov += item.aov;
+        agg.aovCount += 1;
+        agg.days += 1;
+      });
+      return [...map.values()].map(item => ({
+        ...item,
+        conversionRate: item.conversionRateCount ? item.conversionRateTotal / item.conversionRateCount : 0,
+        aov: item.aovCount ? item.aov / item.aovCount : 0
+      })).sort((a, b) => a.month.localeCompare(b.month));
+    }
+
+    function getAggregatedData(records) {
+      return viewMode === 'month' ? aggregateByMonth(records) : aggregateByDate(records);
+    }
+
+    function getAggLabel(item) {
+      return viewMode === 'month' ? formatMonthLabel(item.month) : item.date.slice(0, 5);
+    }
+
+    function aggregateByStore(records) {
+      const map = new Map();
+      records.forEach(item => {
+        if (!map.has(item.storeCode)) {
+          map.set(item.storeCode, { storeCode: item.storeCode, country: item.country, countryCode: item.countryCode, currency: item.currency, gmvCny: 0, gmvOriginal: 0, orders: 0, days: 0, latestDate: item.date });
+        }
+        const agg = map.get(item.storeCode);
+        agg.gmvCny += item.gmvCny;
+        agg.gmvOriginal += item.gmvOriginal;
+        agg.orders += item.orders;
+        agg.days += 1;
+        agg.latestDate = item.date;
+      });
+      return [...map.values()].sort((a, b) => b.gmvCny - a.gmvCny);
+    }
+
+    function aggregateByCountry(records) {
+      const map = new Map();
+      records.forEach(item => {
+        if (!map.has(item.countryCode)) {
+          map.set(item.countryCode, { countryCode: item.countryCode, country: item.country, stores: new Set(), gmvCny: 0, orders: 0, customers: 0, days: 0 });
+        }
+        const agg = map.get(item.countryCode);
+        agg.stores.add(item.storeCode);
+        agg.gmvCny += item.gmvCny;
+        agg.orders += item.orders;
+        agg.customers += item.customers;
+        agg.days += 1;
+      });
+      return [...map.values()].map(item => ({ ...item, storeCount: item.stores.size })).sort((a, b) => b.gmvCny - a.gmvCny);
+    }
+
+    function updateConvertedValuesWithRates() {
+      state.records = state.records.map(item => ({
+        ...item,
+        exchangeRate: state.exchangeRates[item.currency] || 1,
+        gmvCny: item.gmvOriginal * (state.exchangeRates[item.currency] || 1)
+      }));
+    }
+
+    function populateFilters() {
+      const countries = [...new Set(state.records.map(item => item.countryCode))];
+      const stores = [...new Set(state.records.map(item => item.storeCode))].sort();
+      const countrySelect = document.getElementById('countryFilter');
+      const storeSelect = document.getElementById('storeFilter');
+      const compareSelect = document.getElementById('compareStoreFilter');
+      countrySelect.innerHTML = ['<option value="ALL">全部国家</option>', ...countries.map(code => `<option value="${code}">${COUNTRY_MAP[code]?.country || code}</option>`)].join('');
+      storeSelect.innerHTML = ['<option value="ALL">全部店铺</option>', ...stores.map(code => `<option value="${code}">${code}</option>`)].join('');
+      compareSelect.innerHTML = ['<option value="ALL">选择单店</option>', ...stores.map(code => `<option value="${code}">${code}</option>`)].join('');
+      countrySelect.value = countries.includes(filters.country) ? filters.country : 'ALL';
+      storeSelect.value = stores.includes(filters.storeCode) ? filters.storeCode : 'ALL';
+      compareSelect.value = stores.includes(filters.compareStoreCode) ? filters.compareStoreCode : 'ALL';
+      document.getElementById('startMonthFilter').value = filters.startMonth;
+      document.getElementById('endMonthFilter').value = filters.endMonth;
+    }
+
+    function renderPeriods() {
+      const filteredRecords = getFilteredRecords();
+      document.getElementById('analysisPeriod').textContent = state.meta.analysisPeriod || '-';
+      document.getElementById('comparePeriod').textContent = state.meta.comparePeriod || '-';
+      document.getElementById('dataMode').textContent = state.meta.mode || '-';
+      document.getElementById('storeCount').textContent = `${new Set(filteredRecords.map(item => item.storeCode)).size} 个`;
+      document.getElementById('thbRate').textContent = formatNumber(state.exchangeRates.THB || 0, 4);
+      document.getElementById('phpRate').textContent = formatNumber(state.exchangeRates.PHP || 0, 4);
+      document.getElementById('rateUpdatedAt').textContent = state.rateUpdatedAt || '未刷新';
+      document.getElementById('rateStatus').textContent = state.rateStatus || '等待刷新';
+    }
+
+    function renderStats() {
+      const filteredRecords = getFilteredRecords();
+      const totalGmvCny = filteredRecords.reduce((sum, item) => sum + item.gmvCny, 0);
+      const totalOrders = filteredRecords.reduce((sum, item) => sum + item.orders, 0);
+      const totalCustomers = filteredRecords.reduce((sum, item) => sum + item.customers, 0);
+      const avgConversion = filteredRecords.length ? filteredRecords.reduce((sum, item) => sum + item.conversionRate, 0) / filteredRecords.length : 0;
+      const totalImpressions = filteredRecords.reduce((sum, item) => sum + item.impressions, 0);
+      const totalClicks = filteredRecords.reduce((sum, item) => sum + item.clicks, 0);
+      const aggregated = getAggregatedData(filteredRecords);
+      const latest = aggregated[aggregated.length - 1] || { gmvCny: 0, orders: 0, customers: 0, conversionRate: 0, impressions: 0, clicks: 0 };
+      const previous = aggregated[aggregated.length - 2] || latest;
+      const cards = [
+        { label: '总 GMV（人民币）', value: `¥${formatValue(totalGmvCny, 'currency')}`, trend: calcTrend(latest.gmvCny, previous.gmvCny) },
+        { label: '总订单数', value: formatValue(totalOrders, 'integer'), trend: calcTrend(latest.orders, previous.orders) },
+        { label: '总客户数', value: formatValue(totalCustomers, 'integer'), trend: calcTrend(latest.customers, previous.customers) },
+        { label: '平均转化率', value: formatValue(avgConversion, 'percent'), trend: calcTrend(latest.conversionRate, previous.conversionRate) },
+        { label: '总曝光次数', value: formatValue(totalImpressions, 'integer'), trend: calcTrend(latest.impressions, previous.impressions) },
+        { label: '总点击量', value: formatValue(totalClicks, 'integer'), trend: calcTrend(latest.clicks, previous.clicks) }
+      ];
+      document.getElementById('statsGrid').innerHTML = cards.map(item => `
+        <div class="card stat-card">
+          <div class="stat-label">${item.label}</div>
+          <div class="stat-value">${item.value}</div>
+          ${item.trend.text ? `<div class="stat-trend ${item.trend.cls}">${item.trend.text}</div>` : '<div class="stat-trend" style="visibility:hidden">-</div>'}
+        </div>
+      `).join('');
+      renderMonthlyStatsCard();
+    }
+
+    function renderMonthlyStatsCard() {
+      const existingCard = document.getElementById('monthlyStatsCard');
+      if (viewMode !== 'month') {
+        if (existingCard) existingCard.style.display = 'none';
+        return;
+      }
+      const filtered = getFilteredRecords();
+      const monthly = aggregateByMonth(filtered);
+      const totalMonths = monthly.length;
+      const totalDays = monthly.reduce((sum, item) => sum + item.days, 0);
+      const avgPerMonth = totalMonths ? (filtered.reduce((sum, item) => sum + item.gmvCny, 0) / totalMonths) : 0;
+      const statsGrid = document.getElementById('statsGrid');
+      const card = existingCard || document.createElement('div');
+      card.id = 'monthlyStatsCard';
+      card.className = 'card stat-card';
+      card.style.display = 'block';
+      card.innerHTML = `
+        <div class="stat-label">月度情况</div>
+        <div class="stat-value">${totalMonths} 个月</div>
+        <div class="stat-trend flat">覆盖 ${totalDays} 天，月均 ¥${formatValue(avgPerMonth, 'currency')}</div>
+      `;
+      if (!existingCard) statsGrid.appendChild(card);
+    }
+
+    function renderMetricSelect() {
+      const select = document.getElementById('metricSelect');
+      select.innerHTML = metricOptions.map(item => `<option value="${item.key}">${item.label}</option>`).join('');
+      select.value = selectedMetric;
+    }
+
+    function renderTrendChart() {
+      const meta = getMetricMeta(selectedMetric);
+      const aggregated = getAggregatedData(getFilteredRecords());
+      const isMonth = viewMode === 'month';
+      const labels = aggregated.map(item => getAggLabel(item));
+      const data = aggregated.map(item => item[selectedMetric] || 0);
+      document.getElementById('trendChartTitle').textContent = isMonth ? '月度趋势图' : '每日趋势图';
+
+      // 构建日期映射，用于点击时关联到原始 date/month
+      const labelToDateMap = {};
+      aggregated.forEach(item => {
+        const label = getAggLabel(item);
+        labelToDateMap[label] = isMonth ? item.month : item.date;
+      });
+
+      if (trendChart) trendChart.destroy();
+      trendChart = new Chart(document.getElementById('trendChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: meta.label,
+            data,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, 0.12)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: isMonth ? 7 : 4,
+            pointBackgroundColor: '#2563eb',
+            pointBorderColor: '#2563eb',
+            pointBorderWidth: 2,
+            pointHoverRadius: isMonth ? 10 : 7,
+            pointHoverBorderWidth: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                afterBody: function(context) {
+                  const idx = context[0].dataIndex;
+                  const label = labels[idx];
+                  const dateVal = labelToDateMap[label];
+                  return dateVal && filters.selectedDate === dateVal ? '\n📌 当前选中' : '\n点击可联动筛选';
+                }
+              }
+            }
+          },
+          onClick: (event, elements) => {
+            if (!elements.length) return;
+            const idx = elements[0].index;
+            const label = labels[idx];
+            const dateVal = labelToDateMap[label];
+            if (!dateVal) return;
+
+            // 点击已选中的日期则取消筛选
+            if (filters.selectedDate === dateVal) {
+              filters.selectedDate = '';
+            } else {
+              filters.selectedDate = dateVal;
+            }
+            renderAll();
+          },
+          scales: {
+            y: {
+              ticks: {
+                callback: value => meta.type === 'percent' ? `${(Number(value) * 100).toFixed(1)}%` : formatNumber(value, meta.type === 'currency' ? 0 : 0)
+              }
+            },
+            x: {
+              ticks: { maxRotation: 0, minRotation: 0 }
+            }
+          }
+        }
+      });
+
+      // 更新选中点的视觉样式
+      updateChartHighlight();
+    }
+
+    function updateChartHighlight() {
+      if (!trendChart) return;
+      if (!filters.selectedDate) {
+        // 恢复默认样式
+        trendChart.data.datasets[0].pointBackgroundColor = '#2563eb';
+        trendChart.data.datasets[0].pointBorderColor = '#2563eb';
+        trendChart.update();
+        return;
+      }
+      // 找到选中点的索引
+      const aggregated = getAggregatedData(getFilteredRecords());
+      const isMonth = viewMode === 'month';
+      const selectedIdx = aggregated.findIndex(item =>
+        isMonth ? item.month === filters.selectedDate : item.date === filters.selectedDate
+      );
+      // 高亮选中点
+      const colors = aggregated.map((_, i) => i === selectedIdx ? '#dc2626' : '#2563eb');
+      const bgColors = aggregated.map((_, i) => i === selectedIdx ? 'rgba(220,38,38,0.2)' : 'rgba(37,99,235,0.12)');
+      trendChart.data.datasets[0].pointBackgroundColor = colors;
+      trendChart.data.datasets[0].pointBorderColor = colors;
+      trendChart.data.datasets[0].pointRadius = aggregated.map((_, i) => i === selectedIdx ? 10 : (isMonth ? 7 : 4));
+      trendChart.data.datasets[0].backgroundColor = bgColors[bgColors.length - 1];
+      trendChart.update();
+    }
+
+    function renderStoreList() {
+      const stores = aggregateByStore(getFilteredRecords());
+      document.getElementById('storeList').innerHTML = stores.length ? stores.map((item, idx) => `
+        <div class="store-item clickable ${filters.storeCode === item.storeCode ? 'active' : ''}" data-store-code="${item.storeCode}">
+          <div>
+            <strong>TOP ${idx + 1} · ${item.storeCode} · ${item.country}</strong>
+            <span>${item.currency} 原币累计 ${formatValue(item.gmvOriginal, 'currency')}，订单 ${formatValue(item.orders, 'integer')}，记录 ${item.days} 天</span>
+          </div>
+          <div class="store-value">
+            <b>¥${formatValue(item.gmvCny, 'currency')}</b>
+            <span>截至 ${item.latestDate}</span>
+          </div>
+        </div>
+      `).join('') : '<div class="empty-state">暂无店铺数据</div>';
+      document.querySelectorAll('#storeList .store-item.clickable').forEach(node => {
+        node.addEventListener('click', () => setStoreFilter(node.dataset.storeCode));
+      });
+    }
+
+    function renderCountryList() {
+      const countries = aggregateByCountry(getFilteredRecords());
+      document.getElementById('countryList').innerHTML = countries.length ? countries.map(item => `
+        <div class="country-item clickable ${filters.country === item.countryCode ? 'active' : ''}" data-country-code="${item.countryCode}">
+          <div>
+            <strong>${item.country}</strong>
+            <span>店铺 ${item.storeCount} 个，订单 ${formatValue(item.orders, 'integer')}，客户 ${formatValue(item.customers, 'integer')}</span>
+          </div>
+          <div class="country-value">
+            <b>¥${formatValue(item.gmvCny, 'currency')}</b>
+            <span>覆盖 ${item.days} 条日记录</span>
+          </div>
+        </div>
+      `).join('') : '<div class="empty-state">暂无国家汇总数据</div>';
+      document.querySelectorAll('#countryList .country-item.clickable').forEach(node => {
+        node.addEventListener('click', () => setCountryFilter(node.dataset.countryCode));
+      });
+    }
+
+    function renderImportLogs() {
+      const logs = [...(state.importLogs || [])].sort((a, b) => b.importedAt.localeCompare(a.importedAt));
+      document.getElementById('importLogList').innerHTML = logs.length ? logs.map(item => `
+        <div class="import-log-item">
+          <div>
+            <strong>${item.storeCode} · ${COUNTRY_MAP[item.countryCode]?.country || item.countryCode}</strong>
+            <span>最近文件：${item.fileName}</span>
+          </div>
+          <div class="import-log-value">
+            <b>${item.recordCount} 条</b>
+            <span>${item.importedAt}</span>
+          </div>
+        </div>
+      `).join('') : '<div class="empty-state">暂无导入记录</div>';
+    }
+
+    function renderCompareList() {
+      const compareCode = filters.compareStoreCode === 'ALL' ? (aggregateByStore(getFilteredRecords())[0]?.storeCode || 'ALL') : filters.compareStoreCode;
+      const records = getFilteredRecords().filter(item => compareCode === 'ALL' ? false : item.storeCode === compareCode);
+      if (!records.length) {
+        document.getElementById('compareList').innerHTML = '<div class="empty-state">请选择一个店铺查看单店对比</div>';
+        return;
+      }
+      const totalGmv = records.reduce((sum, item) => sum + item.gmvCny, 0);
+      const totalOrders = records.reduce((sum, item) => sum + item.orders, 0);
+      const totalCustomers = records.reduce((sum, item) => sum + item.customers, 0);
+      const avgConversion = records.reduce((sum, item) => sum + item.conversionRate, 0) / records.length;
+      const compareData = getAggregatedData(records);
+      const latest = compareData[compareData.length - 1] || { gmvCny: 0, orders: 0, customers: 0, conversionRate: 0 };
+      const previous = compareData[compareData.length - 2] || latest;
+      const items = [
+        { label: '单店人民币 GMV', sub: `${compareCode} 当前筛选周期累计`, value: `¥${formatValue(totalGmv, 'currency')}`, trend: calcTrend(latest.gmvCny, previous.gmvCny) },
+        { label: '单店订单数', sub: `${compareCode} 当前筛选周期累计`, value: formatValue(totalOrders, 'integer'), trend: calcTrend(latest.orders, previous.orders) },
+        { label: '单店客户数', sub: `${compareCode} 当前筛选周期累计`, value: formatValue(totalCustomers, 'integer'), trend: calcTrend(latest.customers, previous.customers) },
+        { label: '单店平均转化率', sub: `${compareCode} 当前筛选周期平均`, value: formatValue(avgConversion, 'percent'), trend: calcTrend(latest.conversionRate, previous.conversionRate) }
+      ];
+      document.getElementById('compareList').innerHTML = items.map(item => `
+        <div class="compare-item">
+          <div><strong>${item.label}</strong><span>${item.sub}</span></div>
+          <div class="compare-value"><b>${item.value}</b>${item.trend.text ? `<span class="${item.trend.cls}">${item.trend.text}</span>` : ''}</div>
+        </div>
+      `).join('');
+    }
+
+    function getPerformanceTag(record) {
+      if (viewMode === 'month') return `<span class="tag tag-mid">${record.days || 0} 天</span>`;
+      if (record.gmvCny >= 4000) return '<span class="tag tag-high">高峰日</span>';
+      if (record.gmvCny >= 1800) return '<span class="tag tag-mid">稳定日</span>';
+      return '<span class="tag tag-low">低量日</span>';
+    }
+
+    function getMonthTable() {
+      const monthly = aggregateByMonth(getFilteredRecords());
+      return monthly.map(item => `
+        <tr>
+          <td>全部店铺</td>
+          <td>汇总</td>
+          <td>-</td>
+          <td><strong>${formatMonthLabel(item.month)}</strong></td>
+          <td>${formatValue(item.gmvOriginal, 'currency')}</td>
+          <td>-</td>
+          <td>¥${formatValue(item.gmvCny, 'currency')}</td>
+          <td>${formatValue(item.orders, 'integer')}</td>
+          <td>${formatValue(item.customers, 'integer')}</td>
+          <td>${formatValue(item.soldItems, 'integer')}</td>
+          <td>${formatValue(item.refundedItems, 'currency')}</td>
+          <td>${formatValue(item.skuOrders, 'integer')}</td>
+          <td>${formatValue(item.revenue, 'currency')}</td>
+          <td>${formatValue(item.pageViews, 'integer')}</td>
+          <td>${formatValue(item.visitors, 'integer')}</td>
+          <td>${formatValue(item.conversionRate, 'percent')}</td>
+          <td>${formatValue(item.impressions, 'integer')}</td>
+          <td>${formatValue(item.uniqueImpressions, 'integer')}</td>
+          <td>${formatValue(item.clicks, 'integer')}</td>
+          <td>${formatValue(item.uniqueClicks, 'integer')}</td>
+          <td>${formatValue(item.aov, 'currency')}</td>
+          <td>${getPerformanceTag(item)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('recordTableBody');
+      const filteredRecords = getFilteredRecords();
+      const isMonth = viewMode === 'month';
+      document.getElementById('dateColumnTitle').textContent = isMonth ? '月份' : '日期';
+      document.getElementById('performanceColumnTitle').textContent = isMonth ? '覆盖天数' : '日度表现';
+      if (!filteredRecords.length) {
+        tbody.innerHTML = '<tr><td colspan="22" class="empty-state">暂无数据，请导入 TikTok 分析表。</td></tr>';
+        return;
+      }
+      if (isMonth) {
+        tbody.innerHTML = getMonthTable();
+        return;
+      }
+      tbody.innerHTML = filteredRecords.map(item => `
+        <tr>
+          <td>${item.storeCode}</td>
+          <td>${item.country}</td>
+          <td>${item.currency}</td>
+          <td>${item.date}</td>
+          <td>${formatValue(item.gmvOriginal, 'currency')}</td>
+          <td>${formatNumber(item.exchangeRate, 4)}</td>
+          <td>¥${formatValue(item.gmvCny, 'currency')}</td>
+          <td>${formatValue(item.orders, 'integer')}</td>
+          <td>${formatValue(item.customers, 'integer')}</td>
+          <td>${formatValue(item.soldItems, 'integer')}</td>
+          <td>${formatValue(item.refundedItems, 'currency')}</td>
+          <td>${formatValue(item.skuOrders, 'integer')}</td>
+          <td>${formatValue(item.revenue, 'currency')}</td>
+          <td>${formatValue(item.pageViews, 'integer')}</td>
+          <td>${formatValue(item.visitors, 'integer')}</td>
+          <td>${formatValue(item.conversionRate, 'percent')}</td>
+          <td>${formatValue(item.impressions, 'integer')}</td>
+          <td>${formatValue(item.uniqueImpressions, 'integer')}</td>
+          <td>${formatValue(item.clicks, 'integer')}</td>
+          <td>${formatValue(item.uniqueClicks, 'integer')}</td>
+          <td>${formatValue(item.aov, 'currency')}</td>
+          <td>${getPerformanceTag(item)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderRanking() {
+      const isMonth = viewMode === 'month';
+      document.getElementById('rankingTitle').textContent = isMonth ? '人民币 GMV 高峰月排行' : '人民币 GMV 高峰日排行';
+      document.getElementById('rankingSubtitle').textContent = isMonth ? '按实际月份人民币 GMV 排序' : '按单日人民币 GMV 排序';
+      if (isMonth) {
+        const monthly = aggregateByMonth(getFilteredRecords());
+        const sorted = [...monthly].sort((a, b) => b.gmvCny - a.gmvCny).slice(0, 8);
+        document.getElementById('rankingList').innerHTML = sorted.length ? sorted.map((item, idx) => `
+          <div class="ranking-item">
+            <div class="ranking-name"><span class="ranking-index">${idx + 1}</span><span>${formatMonthLabel(item.month)}（${item.days} 天）</span></div>
+            <strong>¥${formatValue(item.gmvCny, 'currency')}</strong>
+          </div>
+        `).join('') : '<div class="empty-state">暂无可排行数据</div>';
+        return;
+      }
+      const sorted = [...getFilteredRecords()].sort((a, b) => b.gmvCny - a.gmvCny).slice(0, 8);
+      document.getElementById('rankingList').innerHTML = sorted.length ? sorted.map((item, idx) => `
+        <div class="ranking-item">
+          <div class="ranking-name"><span class="ranking-index">${idx + 1}</span><span>${item.storeCode} · ${item.date}</span></div>
+          <strong>¥${formatValue(item.gmvCny, 'currency')}</strong>
+        </div>
+      `).join('') : '<div class="empty-state">暂无可排行数据</div>';
+    }
+
+    function renderFlowChart() {
+      const filteredRecords = getFilteredRecords();
+      const totalImpressions = filteredRecords.reduce((sum, item) => sum + item.impressions, 0);
+      const totalClicks = filteredRecords.reduce((sum, item) => sum + item.clicks, 0);
+      const totalVisitors = filteredRecords.reduce((sum, item) => sum + item.visitors, 0);
+      if (flowChart) flowChart.destroy();
+      flowChart = new Chart(document.getElementById('flowChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['商品曝光次数', '商品点击量', '商品访客数'],
+          datasets: [{ data: [totalImpressions, totalClicks, totalVisitors], backgroundColor: ['#2563eb', '#7c3aed', '#10b981'], borderWidth: 0 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+
+    function renderSummary() {
+      const filteredRecords = getFilteredRecords();
+      const isMonth = viewMode === 'month';
+      const monthly = isMonth ? aggregateByMonth(filteredRecords) : [];
+      document.getElementById('tableSummaryLeft').textContent = isMonth ? `当前记录：${monthly.length} 个月（覆盖 ${monthly.reduce((sum, item) => sum + item.days, 0)} 天）` : `当前记录：${filteredRecords.length} 条（按店铺 + 日期）`;
+      document.getElementById('tableSummaryRight').textContent = `识别结构：${state.meta.mode || '多店铺 TikTok 每日数据'}`;
+      document.getElementById('tableTitle').textContent = isMonth ? '月度明细表' : '每日明细表';
+      document.getElementById('tableSubtitle').textContent = isMonth ? '按实际月份聚合汇总，GMV 同时保留原币和人民币' : '按店铺 + 日期记录，GMV 同时保留原币和人民币';
+    }
+
+    function updateDeleteStoreFilter() {
+      const select = document.getElementById('deleteStoreFilter');
+      const storeCodes = [...new Set(state.records.map(r => r.storeCode))].sort();
+      select.innerHTML = '<option value="">-- 选择店铺 --</option>' + 
+        storeCodes.map(code => `<option value="${code}">${code}</option>`).join('');
+    }
+
+    function setCountryFilter(countryCode) {
+      filters.country = filters.country === countryCode ? 'ALL' : countryCode;
+      if (filters.country !== 'ALL') {
+        const validStores = state.records.filter(item => item.countryCode === filters.country).map(item => item.storeCode);
+        if (!validStores.includes(filters.storeCode)) filters.storeCode = 'ALL';
+        if (!validStores.includes(filters.compareStoreCode)) filters.compareStoreCode = 'ALL';
+      }
+      renderAll();
+    }
+
+    function setStoreFilter(storeCode) {
+      filters.storeCode = filters.storeCode === storeCode ? 'ALL' : storeCode;
+      if (filters.storeCode !== 'ALL') {
+        const record = state.records.find(item => item.storeCode === filters.storeCode);
+        if (record) filters.country = record.countryCode;
+        filters.compareStoreCode = filters.storeCode;
+      }
+      renderAll();
+    }
+
+    function renderLinkageTips() {
+      const countryTip = document.getElementById('countryLinkageTip');
+      const storeTip = document.getElementById('storeLinkageTip');
+      countryTip.textContent = filters.country === 'ALL' ? '点击任一国家，可自动联动筛选当前页面到该国家。' : `当前已联动国家：${COUNTRY_MAP[filters.country]?.country || filters.country}，再次点击同卡片可取消。`;
+      storeTip.textContent = filters.storeCode === 'ALL' ? '点击任一店铺，可自动联动筛选当前页面到该店铺。' : `当前已联动店铺：${filters.storeCode}，再次点击同卡片可取消。`;
+    }
+
+    function renderChartLinkageBar() {
+      const bar = document.getElementById('chartLinkageBar');
+      const text = document.getElementById('chartLinkageText');
+      if (filters.selectedDate) {
+        const isMonth = viewMode === 'month';
+        const display = isMonth ? formatMonthLabel(filters.selectedDate) : filters.selectedDate;
+        const mode = isMonth ? '月' : '日';
+        text.textContent = `📌 图表联动：已选中 ${mode}维度「${display}」，当前所有模块仅显示该${mode}的数据。点击图表其他点可切换，点击已选点或下方按钮可取消。`;
+        bar.style.display = 'flex';
+      } else {
+        bar.style.display = 'none';
+      }
+    }
+
+    function renderAll() {
+      populateFilters();
+      renderPeriods();
+      renderMetricSelect();
+      renderStats();
+      renderTrendChart();
+      renderStoreList();
+      renderCountryList();
+      renderImportLogs();
+      renderCompareList();
+      renderTable();
+      renderRanking();
+      renderFlowChart();
+      renderSummary();
+      renderLinkageTips();
+      renderChartLinkageBar();
+      updateDeleteStoreFilter();
+      saveState();
+    }
+
+    function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
+    function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
+
+    function setImportMessage(text) {
+      document.getElementById('importMessage').textContent = text;
+    }
+
+    function extractMeta(rows) {
+      const firstRow = rows[0] || [];
+      const analysisCell = firstRow.find(item => String(item).includes('分析日期')) || '';
+      const compareCell = firstRow.find(item => String(item).includes('对比日期')) || '';
+      return {
+        analysisPeriod: analysisCell.replace('分析日期：', '').trim() || '-',
+        comparePeriod: compareCell.replace('对比日期：', '').trim() || '-',
+        mode: '多店铺 TikTok Excel 导入数据'
+      };
+    }
+
+    function locateDailyRows(rows) {
+      const dailyTitleIndex = rows.findIndex(row => row.some(cell => String(cell).trim() === '每日数据'));
+      if (dailyTitleIndex >= 0 && rows[dailyTitleIndex + 1]) return rows.slice(dailyTitleIndex + 1);
+      const headerIndex = rows.findIndex(row => String(row[0] || '').trim() === '日期' && row.length > 5);
+      if (headerIndex >= 0) return rows.slice(headerIndex);
+      return [];
+    }
+
+    function parseDailySection(rows, storeInfo, meta) {
+      const section = locateDailyRows(rows);
+      if (!section.length) throw new Error('没有找到“每日数据”区域或日期表头。');
+      const header = section[0].map(item => String(item).trim());
+      const dataRows = section.slice(1).filter(row => row[0] && String(row[0]).trim());
+      return dataRows.map(row => {
+        const map = Object.fromEntries(header.map((key, index) => [key, row[index]]));
+        return buildRecord([
+          map['日期'], map['GMV'], map['订单数'], map['客户数'], map['商品成交件数'], map['已退款的商品件数'],
+          map['SKU 订单数'], map['总成交额'], map['页面浏览次数'], map['商品访客数'], map['转化率'],
+          map['商品曝光次数'], map['去重商品曝光次数'], map['商品点击量'], map['去重点击次数'], map['平均订单金额']
+        ], storeInfo, meta, state.exchangeRates);
+      });
+    }
+
+    async function refreshExchangeRates(showMessage = true) {
+      try {
+        const res = await fetch('https://open.er-api.com/v6/latest/CNY');
+        const data = await res.json();
+        if (data && data.result === 'success' && data.rates) {
+          const thb = data.rates.THB ? 1 / data.rates.THB : state.exchangeRates.THB;
+          const php = data.rates.PHP ? 1 / data.rates.PHP : state.exchangeRates.PHP;
+          state.exchangeRates = { ...state.exchangeRates, THB: thb, PHP: php, CNY: 1 };
+          state.rateUpdatedAt = new Date().toLocaleString('zh-CN');
+          state.rateStatus = '刷新成功';
+          updateConvertedValuesWithRates();
+          if (showMessage) setImportMessage(`已刷新实时汇率：THB/CNY=${formatNumber(thb, 4)}，PHP/CNY=${formatNumber(php, 4)}。`);
+          renderAll();
+          return;
+        }
+        throw new Error('汇率接口返回异常');
+      } catch {
+        state.rateStatus = '刷新失败，使用上次/默认汇率';
+        if (!state.rateUpdatedAt) state.rateUpdatedAt = '未成功刷新';
+        if (showMessage) setImportMessage('实时汇率刷新失败，当前继续使用默认/上次成功获取的汇率。');
+        renderAll();
+      }
+    }
+
+    async function importFiles(files) {
+      showLoading();
+      try {
+        let merged = [...state.records];
+        let lastMeta = state.meta;
+        const importedStores = [];
+        const logUpdates = [];
+        const now = new Date().toLocaleString('zh-CN');
+
+        for (const file of files) {
+          const storeInfo = parseStoreInfo(file.name);
+          importedStores.push(`${storeInfo.storeCode}-${storeInfo.countryCode}`);
+          const buffer = await file.arrayBuffer();
+          const workbook = XLSX.read(buffer, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+          const meta = extractMeta(rows);
+          lastMeta = meta;
+          const records = parseDailySection(rows, storeInfo, meta);
+          merged = mergeRecords(merged, records);
+          logUpdates.push({ storeCode: storeInfo.storeCode, countryCode: storeInfo.countryCode, fileName: file.name, importedAt: now, recordCount: records.length, sheetName });
+          setImportMessage(`已读取 ${file.name}（工作表：${sheetName}）...`);
+        }
+
+        state.meta = lastMeta;
+        state.records = merged;
+        state.importLogs = updateImportLogs(state.importLogs || [], logUpdates);
+        state.meta.mode = '多店铺 TikTok Excel 导入数据';
+        selectedMetric = 'gmvCny';
+        setImportMessage(`导入成功：已处理 ${files.length} 个文件，涉及店铺 ${importedStores.join('、')}。`);
+        renderAll();
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function bindEvents() {
+      // 明细表折叠/展开
+      const collapseBtn = document.getElementById('tableCollapseBtn');
+      const collapseBody = document.getElementById('tableCollapsibleBody');
+      collapseBtn.addEventListener('click', () => {
+        const isCollapsed = collapseBody.classList.toggle('collapsed');
+        collapseBtn.classList.toggle('collapsed', isCollapsed);
+        collapseBtn.innerHTML = isCollapsed ? '<span class="arrow">▼</span> 展开表格' : '<span class="arrow">▼</span> 收起表格';
+      });
+      document.getElementById('metricSelect').addEventListener('change', event => {
+        selectedMetric = event.target.value;
+        renderTrendChart();
+      });
+
+      document.getElementById('countryFilter').addEventListener('change', event => {
+        filters.country = event.target.value;
+        if (filters.country !== 'ALL') {
+          const validStores = state.records.filter(item => item.countryCode === filters.country).map(item => item.storeCode);
+          if (!validStores.includes(filters.storeCode)) filters.storeCode = 'ALL';
+          if (!validStores.includes(filters.compareStoreCode)) filters.compareStoreCode = 'ALL';
+        }
+        renderAll();
+      });
+
+      document.getElementById('storeFilter').addEventListener('change', event => {
+        filters.storeCode = event.target.value;
+        renderAll();
+      });
+
+      document.getElementById('compareStoreFilter').addEventListener('change', event => {
+        filters.compareStoreCode = event.target.value;
+        renderCompareList();
+      });
+
+      document.getElementById('startMonthFilter').addEventListener('change', event => {
+        filters.startMonth = event.target.value;
+        renderAll();
+      });
+
+      document.getElementById('endMonthFilter').addEventListener('change', event => {
+        filters.endMonth = event.target.value;
+        renderAll();
+      });
+
+      // 图表联动 - 清除日期筛选
+      document.getElementById('clearDateFilterBtn').addEventListener('click', () => {
+        filters.selectedDate = '';
+        renderAll();
+      });
+
+      document.getElementById('viewDayBtn').addEventListener('click', () => {
+        viewMode = 'day';
+        document.getElementById('viewDayBtn').style.background = '#2563eb';
+        document.getElementById('viewDayBtn').style.color = '#fff';
+        document.getElementById('viewMonthBtn').style.background = '#fff';
+        document.getElementById('viewMonthBtn').style.color = '#1f2937';
+        renderAll();
+      });
+
+      document.getElementById('viewMonthBtn').addEventListener('click', () => {
+        viewMode = 'month';
+        document.getElementById('viewMonthBtn').style.background = '#2563eb';
+        document.getElementById('viewMonthBtn').style.color = '#fff';
+        document.getElementById('viewDayBtn').style.background = '#fff';
+        document.getElementById('viewDayBtn').style.color = '#1f2937';
+        renderAll();
+      });
+
+      document.getElementById('fileInput').addEventListener('change', async event => {
+        const files = [...event.target.files];
+        if (!files.length) return;
+        try {
+          setImportMessage(`正在读取 ${files.length} 个文件...`);
+          await importFiles(files);
+        } catch (error) {
+          setImportMessage(`导入失败：${error.message}`);
+        }
+      });
+
+      document.getElementById('loadSampleBtn').addEventListener('click', () => {
+        state = buildSampleState();
+        filters = { country: 'ALL', storeCode: 'ALL', compareStoreCode: 'ALL', startMonth: '', endMonth: '' };
+        viewMode = 'day';
+        document.getElementById('viewDayBtn').style.background = '#2563eb';
+        document.getElementById('viewDayBtn').style.color = '#fff';
+        document.getElementById('viewMonthBtn').style.background = '#fff';
+        document.getElementById('viewMonthBtn').style.color = '#1f2937';
+        selectedMetric = 'gmvCny';
+        setImportMessage('已恢复多店铺示例数据。');
+        renderAll();
+      });
+
+      document.getElementById('refreshRateBtn').addEventListener('click', () => refreshExchangeRates(true));
+
+      // 删除店铺 - 打开模态框
+      document.getElementById('deleteStoreHeaderBtn').addEventListener('click', () => {
+        document.getElementById('deleteModalMessage').textContent = '';
+        document.getElementById('deleteStoreFilter').value = '';
+        document.getElementById('deleteModal').classList.add('open');
+      });
+
+      // 删除店铺 - 取消
+      document.getElementById('deleteModalCancelBtn').addEventListener('click', () => {
+        document.getElementById('deleteModal').classList.remove('open');
+      });
+
+      // 删除店铺 - 点击遮罩关闭
+      document.getElementById('deleteModal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('deleteModal')) {
+          document.getElementById('deleteModal').classList.remove('open');
+        }
+      });
+
+      // 删除店铺 - 确认删除
+      document.getElementById('deleteStoreBtn').addEventListener('click', () => {
+        const storeCode = document.getElementById('deleteStoreFilter').value;
+        const msgEl = document.getElementById('deleteModalMessage');
+        if (!storeCode) {
+          msgEl.textContent = '请先选择要删除的店铺。';
+          msgEl.style.color = '#dc2626';
+          return;
+        }
+        const recordCount = state.records.filter(r => r.storeCode === storeCode).length;
+        const importCount = state.importLogs.filter(log => log.storeCode === storeCode).length;
+        if (!recordCount && !importCount) {
+          msgEl.textContent = '该店铺没有数据。';
+          msgEl.style.color = '#dc2626';
+          return;
+        }
+        const confirmDelete = confirm(`确定要删除店铺 "${storeCode}" 的所有数据吗？\n\n这将删除：\n- ${recordCount} 条记录\n- ${importCount} 条导入记录\n\n此操作不可恢复！`);
+        if (!confirmDelete) return;
+        
+        // 删除记录
+        state.records = state.records.filter(r => r.storeCode !== storeCode);
+        // 删除导入日志
+        state.importLogs = state.importLogs.filter(log => log.storeCode !== storeCode);
+        // 如果当前筛选器选中的是该店铺，重置为ALL
+        if (filters.storeCode === storeCode) filters.storeCode = 'ALL';
+        if (filters.compareStoreCode === storeCode) filters.compareStoreCode = 'ALL';
+        
+        msgEl.textContent = `已删除店铺 "${storeCode}" 的 ${recordCount} 条记录和 ${importCount} 条导入记录。`;
+        msgEl.style.color = '#16a34a';
+        document.getElementById('deleteModal').classList.remove('open');
+        renderAll();
+      });
+
+      document.getElementById('clearBtn').addEventListener('click', () => {
+        state = {
+          meta: { analysisPeriod: '-', comparePeriod: '-', mode: '空数据模式' },
+          exchangeRates: { ...DEFAULT_RATES },
+          rateUpdatedAt: '',
+          rateStatus: '未刷新',
+          importLogs: [],
+          records: []
+        };
+        filters = { country: 'ALL', storeCode: 'ALL', compareStoreCode: 'ALL', startMonth: '', endMonth: '' };
+        viewMode = 'day';
+        document.getElementById('viewDayBtn').style.background = '#2563eb';
+        document.getElementById('viewDayBtn').style.color = '#fff';
+        document.getElementById('viewMonthBtn').style.background = '#fff';
+        document.getElementById('viewMonthBtn').style.color = '#1f2937';
+        setImportMessage('已清空当前数据，你现在可以导入新的多店铺 TikTok 每日分析表。');
+        renderAll();
+      });
+
+      document.getElementById('exportBtn').addEventListener('click', () => {
+        if (viewMode === 'month') {
+          const monthly = aggregateByMonth(getFilteredRecords());
+          const header = ['月份', 'GMV原币', 'GMV人民币', '订单数', '客户数', '商品成交件数', '已退款的商品件数', 'SKU订单数', '总成交额', '页面浏览次数', '商品访客数', '转化率', '商品曝光次数', '去重商品曝光次数', '商品点击量', '去重点击次数', '平均订单金额', '覆盖天数'];
+          const rows = monthly.map(item => [
+            item.month, item.gmvOriginal, item.gmvCny, item.orders, item.customers, item.soldItems, item.refundedItems,
+            item.skuOrders, item.revenue, item.pageViews, item.visitors, item.conversionRate, item.impressions,
+            item.uniqueImpressions, item.clicks, item.uniqueClicks, item.aov, item.days
+          ]);
+          const csv = [header, ...rows].map(row => row.join(',')).join('\n');
+          const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = 'tiktok_store_monthly_metrics_filtered.csv';
+          link.click();
+          URL.revokeObjectURL(link.href);
+          return;
+        }
+
+        const filteredRecords = getFilteredRecords();
+        const header = ['店编', '国家', '币种', '日期', 'GMV原币', '汇率', 'GMV人民币', '订单数', '客户数', '商品成交件数', '已退款的商品件数', 'SKU订单数', '总成交额', '页面浏览次数', '商品访客数', '转化率', '商品曝光次数', '去重商品曝光次数', '商品点击量', '去重点击次数', '平均订单金额'];
+        const rows = filteredRecords.map(item => [
+          item.storeCode, item.country, item.currency, item.date, item.gmvOriginal, item.exchangeRate, item.gmvCny,
+          item.orders, item.customers, item.soldItems, item.refundedItems, item.skuOrders, item.revenue, item.pageViews,
+          item.visitors, item.conversionRate, item.impressions, item.uniqueImpressions, item.clicks, item.uniqueClicks, item.aov
+        ]);
+        const csv = [header, ...rows].map(row => row.join(',')).join('\n');
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'tiktok_store_daily_metrics_filtered.csv';
+        link.click();
+        URL.revokeObjectURL(link.href);
+      });
+
+      // 导出备份（JSON 完整状态）
+      document.getElementById('exportBackupBtn').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        const now = new Date();
+        const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+        link.download = `tiktok_backup_${ts}.json`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      });
+
+      // 导入备份（JSON 完整状态）
+      document.getElementById('importBackupBtn').addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.addEventListener('change', async e => {
+          const file = e.target.files[0];
+          if (!file) return;
+          try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+            if (!data.records || !data.importLogs) {
+              alert('文件格式不正确，请选择有效的备份文件（包含 records 和 importLogs 字段）。');
+              return;
+            }
+            state = data;
+            filters = { country: 'ALL', storeCode: 'ALL', compareStoreCode: 'ALL', startMonth: '', endMonth: '', selectedDate: '' };
+            viewMode = 'day';
+            document.getElementById('viewDayBtn').style.background = '#2563eb';
+            document.getElementById('viewDayBtn').style.color = '#fff';
+            document.getElementById('viewMonthBtn').style.background = '#fff';
+            document.getElementById('viewMonthBtn').style.color = '#1f2937';
+            setImportMessage(`已从备份文件恢复 ${data.records.length} 条记录。`);
+            renderAll();
+          } catch (err) {
+            alert('读取备份文件失败：' + err.message);
+          }
+        });
+        input.click();
+      });
+    }
+
+    // 初始化：检测服务器 → 加载数据 → 绑定事件 → 渲染
+    (async function init() {
+      await checkServer();
+      const statusEl = document.getElementById('serverStatus');
+      if (serverAvailable) {
+        statusEl.innerHTML = '🟢 在线';
+        statusEl.title = '数据存储在 data.json，重启不丢失';
+      } else {
+        statusEl.innerHTML = '🟡 本地';
+        statusEl.title = '数据存储在浏览器，重启可能丢失（建议双击 start.bat 启动服务器）';
+      }
+      state = await loadState() || buildSampleState();
+      bindEvents();
+      refreshExchangeRates(false);
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
